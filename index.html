@@ -5,97 +5,97 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OBD Test</title>
 <style>
-body{font-family:Tahoma,'Segoe UI',sans-serif;background:#F2F4F6;color:#16202B;margin:0;padding:16px;line-height:1.6}
+body{font-family:Tahoma,sans-serif;background:#F2F4F6;color:#16202B;margin:0;padding:16px;line-height:1.6}
 .box{max-width:560px;margin:0 auto;background:#fff;border:1px solid #D8DEE5;border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:12px}
 h1{font-size:20px;margin:0}
 .hint{font-size:13px;color:#5B6776}
-button{font:inherit;font-weight:700;padding:12px;border-radius:8px;border:1px solid #1E4E79;background:#1E4E79;color:#fff}
+button{font:inherit;font-weight:700;padding:12px;border-radius:8px;border:0;background:#1E4E79;color:#fff}
 button:disabled{opacity:.5}
-.vin{font-family:Menlo,Consolas,monospace;font-size:24px;letter-spacing:.06em;direction:ltr;text-align:center;padding:10px;border-radius:8px;background:#E3ECF5;min-height:1.5em}
-.row{display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.vin{font-family:Menlo,monospace;font-size:24px;direction:ltr;text-align:center;padding:10px;border-radius:8px;background:#E3ECF5;min-height:1.5em}
+.row{display:flex;justify-content:space-between;font-size:14px}
 .row b{direction:ltr}
 #st{font-weight:700}
-pre{direction:ltr;text-align:left;font-size:11px;background:#16202B;color:#cfe;padding:10px;border-radius:8px;max-height:260px;overflow:auto;white-space:pre-wrap;margin:0}
+pre{direction:ltr;text-align:left;font-size:11px;background:#16202B;color:#cfe;padding:10px;border-radius:8px;white-space:pre-wrap;margin:0}
 </style>
 </head>
 <body>
 <div class="box">
-  <h1>اختبار قراءة رقم الشاصي عبر OBD-II</h1>
-  <span class="hint">صفحة اختبار: ترسل أوامر قراءة فقط (معلومات المركبة)، ولا تحتوي على أي أمر لمسح الأعطال أو البرمجة.</span>
-  <span class="hint">١) ركّب الجهاز في منفذ OBD وشغّل الإشعال بدون تشغيل المحرك. ٢) اضغط «اتصال وقراءة» واختر الجهاز من القائمة.</span>
-  <button id="go" type="button">اتصال وقراءة</button>
-  <div id="st" aria-live="polite"></div>
-  <div class="vin" id="vin"></div>
-  <div class="row"><span>البروتوكول</span><b id="proto">—</b></div>
-  <div class="row"><span>الجهاز</span><b id="dev">—</b></div>
-  <details><summary class="hint">السجل التقني (أرسله لي إذا ما اشتغلت)</summary><pre id="log"></pre></details>
+<h1>اختبار قراءة رقم الشاصي عبر OBD-II</h1>
+<span class="hint">أوامر قراءة فقط، ولا يوجد أي أمر لمسح الأعطال أو البرمجة.</span>
+<button id="go" type="button">اتصال وقراءة</button>
+<div id="st"></div>
+<div class="vin" id="vin"></div>
+<div class="row"><span>البروتوكول</span><b id="proto">—</b></div>
+<div class="row"><span>الجهاز</span><b id="dev">—</b></div>
+<details><summary class="hint">السجل التقني</summary><pre id="log"></pre></details>
 </div>
 <script>
 const $=id=>document.getElementById(id);
 const log=t=>{$('log').textContent+=t+'\n';};
 const st=t=>{$('st').textContent=t;};
-const SERVICES=['0000fff0-0000-1000-8000-00805f9b34fb','0000ffe0-0000-1000-8000-00805f9b34fb','000018f0-0000-1000-8000-00805f9b34fb','0000ffb0-0000-1000-8000-00805f9b34fb','e7810a71-73ae-499d-8c15-faa9aef0c3f2'];
-const PROTO={'1':'SAE J1850 PWM','2':'SAE J1850 VPW','3':'ISO 9141-2','4':'ISO 14230-4 KWP (5 baud init)','5':'ISO 14230-4 KWP (fast init)','6':'ISO 15765-4 CAN (11 bit ID, 500 kbaud)','7':'ISO 15765-4 CAN (29 bit ID, 500 kbaud)','8':'ISO 15765-4 CAN (11 bit ID, 250 kbaud)','9':'ISO 15765-4 CAN (29 bit ID, 250 kbaud)','A':'SAE J1939 CAN'};
-let wr=null, buf='', waiter=null, device=null;
-
+const B='-0000-1000-8000-00805f9b34fb';
+const SERVICES=['0000fff0'+B,'0000ffe0'+B,'000018f0'+B,'0000ffb0'+B,'e7810a71-73ae-499d-8c15-faa9aef0c3f2'];
+const PROTO={'6':'ISO 15765-4 CAN (11 bit, 500 kbaud)','7':'ISO 15765-4 CAN (29 bit, 500 kbaud)','8':'ISO 15765-4 CAN (11 bit, 250 kbaud)','9':'ISO 15765-4 CAN (29 bit, 250 kbaud)','1':'SAE J1850 PWM','2':'SAE J1850 VPW','3':'ISO 9141-2','4':'ISO 14230-4 KWP','5':'ISO 14230-4 KWP fast'};
+let wr=null,buf='',waiter=null,device=null;
 function onData(e){
-  const s=new TextDecoder().decode(e.target.value);
-  buf+=s;
-  if(buf.indexOf('>')>=0 && waiter){ const out=buf.replace('>',''); buf=''; const w=waiter; waiter=null; w(out); }
-}
+  buf+=new TextDecoder().decode(e.target.value);
+  if(buf.indexOf('>')>=0&&waiter){const o=buf.replace('>','');buf='';const w=waiter;waiter=null;w(o);}
+<script>
 function send(cmd,ms){
-  return new Promise(async (res)=>{
-    buf=''; waiter=res;
-    const t=setTimeout(()=>{ if(waiter){ waiter=null; res(buf+' [TIMEOUT]'); } }, ms||4000);
-    const data=new TextEncoder().encode(cmd+'\r');
-    for(let i=0;i<data.length;i+=20){
-      const chunk=data.slice(i,i+20);
-      if(wr.properties.writeWithoutResponse) await wr.writeValueWithoutResponse(chunk); else await wr.writeValue(chunk);
-    }
+  return new Promise(async res=>{
+    buf='';waiter=res;
+    setTimeout(()=>{if(waiter){waiter=null;res(buf+' [TIMEOUT]');}},ms||4000);
+    const d=new TextEncoder().encode(cmd+'\r');
+    for(let i=0;i<d.length;i+=20){const c=d.slice(i,i+20);
+      if(wr.properties.writeWithoutResponse)await wr.writeValueWithoutResponse(c);else await wr.writeValue(c);}
     log('> '+cmd);
-  }).then(r=>{ log('< '+r.replace(/\r/g,' | ').trim()); return r; });
+  }).then(r=>{log('< '+r.replace(/\r/g,' | ').trim());return r;});
 }
 function parseVin(raw){
-  const lines=raw.toUpperCase().split(/[\r\n]+/).map(l=>l.trim()).filter(Boolean);
   let hex='';
-  lines.forEach(l=>{
+  raw.toUpperCase().split(/[\r\n]+/).forEach(l=>{
     l=l.replace(/\s+/g,'');
-    if(/^[0-9A-F]{1,3}$/.test(l)) return;
-    if(/^[0-9A-F]:/.test(l)) l=l.slice(2);
-    else if(/^4902[0-9A-F]{2}/.test(l)) l=l.slice(6);
-    if(/^[0-9A-F]+$/.test(l)) hex+=l;
+    if(/^[0-9A-F]{1,3}$/.test(l))return;
+    if(/^[0-9A-F]:/.test(l))l=l.slice(2);else if(/^4902[0-9A-F]{2}/.test(l))l=l.slice(6);
+    if(/^[0-9A-F]+$/.test(l))hex+=l;
   });
-  let txt='';
-  for(let i=0;i+1<hex.length;i+=2){ const c=parseInt(hex.substr(i,2),16); txt+=(c>=48&&c<=57)||(c>=65&&c<=90)?String.fromCharCode(c):'.'; }
-  const m=txt.match(/[A-HJ-NPR-Z0-9]{17}/);
-  return m?m[0]:null;
+  let t='';
+  for(let i=0;i+1<hex.length;i+=2){const c=parseInt(hex.substr(i,2),16);t+=(c>=48&&c<=57)||(c>=65&&c<=90)?String.fromCharCode(c):'.';}
+  const m=t.match(/[A-HJ-NPR-Z0-9]{17}/);return m?m[0]:null;
 }
 async function go(){
-  $('go').disabled=true; $('vin').textContent=''; $('proto').textContent='—'; $('log').textContent='';
+  $('go').disabled=true;$('vin').textContent='';$('log').textContent='';
   try{
-    if(!navigator.bluetooth){ st('هذا المتصفح لا يدعم البلوتوث. افتح الصفحة من تطبيق Bluefy.'); log('navigator.bluetooth = undefined'); return; }
+    if(!navigator.bluetooth){st('افتح الصفحة من Bluefy.');return;}
     st('اختر جهاز OBD من القائمة…');
-    device=await navigator.bluetooth.requestDevice({acceptAllDevices:true, optionalServices:SERVICES});
-    $('dev').textContent=device.name||'(بدون اسم)'; log('device: '+device.name);
+    device=await navigator.bluetooth.requestDevice({acceptAllDevices:true,optionalServices:SERVICES});
+    $('dev').textContent=device.name||'-';log('device: '+device.name);
     st('جارٍ الاتصال…');
     const server=await device.gatt.connect();
     const services=await server.getPrimaryServices();
     let nt=null;
-    for(const sv of services){
-      log('service '+sv.uuid);
-      let chars=[]; try{ chars=await sv.getCharacteristics(); }catch(e){}
-      for(const c of chars){
-        const p=c.properties; log('  char '+c.uuid+' '+(p.notify?'N':'')+(p.indicate?'I':'')+(p.write?'W':'')+(p.writeWithoutResponse?'w':''));
-        if(!nt&&(p.notify||p.indicate)) nt=c;
-        if(!wr&&(p.write||p.writeWithoutResponse)) wr=c;
-      }
-      if(nt&&wr) break;
-    }
-    if(!nt||!wr){ st('اتصل بالجهاز لكن لم يُعثر على قناة البيانات. أرسل لي السجل التقني.'); return; }
-    await nt.startNotifications(); nt.addEventListener('characteristicvaluechanged',onData);
+    for(const sv of services){log('service '+sv.uuid);
+      let ch=[];try{ch=await sv.getCharacteristics();}catch(e){}
+      for(const c of ch){const p=c.properties;log('  char '+c.uuid);
+        if(!nt&&(p.notify||p.indicate))nt=c;if(!wr&&(p.write||p.writeWithoutResponse))wr=c;}
+      if(nt&&wr)break;}
+    if(!nt||!wr){st('لم يُعثر على قناة البيانات. أرسل السجل التقني.');return;}
+    await nt.startNotifications();nt.addEventListener('characteristicvaluechanged',onData);
     st('جارٍ تهيئة الجهاز…');
-    await send('ATZ',6000); await send('ATE0'); await send('ATL0'); await send('ATS0'); await send('ATH0'); await send('ATSP0');
-    st('جارٍ قراءة رقم الشاصي من المركبة…');
+    for(const c of ['ATZ','ATE0','ATL0','ATS0','ATH0','ATSP0'])await send(c,c==='ATZ'?6000:4000);
+    st('جارٍ قراءة رقم الشاصي…');
     let r=await send('0902',10000);
-    if(/SEARCHING/.test(r)&&!/49/.test(r)) r=await send('0902',10000);
-    const p
+    if(/SEARCHING/.test(r)&&!/49/.test(r))r=await send('0902',10000);
+    const p=(await send('ATDPN')).replace(/[^0-9A-F]/gi,'');
+    $('proto').textContent=PROTO[p.slice(-1)]||p||'—';
+    const vin=parseVin(r);
+    if(vin){$('vin').textContent=vin;st('تمت قراءة الرقم ✓');}
+    else st('لم يُستخرج الرقم. أرسل السجل التقني.');
+  }catch(e){log('ERROR: '+e);st('تعذّر الاتصال: '+e.message);}
+  finally{try{if(device&&device.gatt.connected)device.gatt.disconnect();}catch(e){}wr=null;$('go').disabled=false;}
+}
+$('go').addEventListener('click',go);
+</script>
+</body>
+</html>
+

@@ -27,6 +27,8 @@ pre{direction:ltr;text-align:left;font-size:11px;background:#16202B;color:#cfe;p
 <div class="vin" id="vin"></div>
 <div class="row"><span>البروتوكول</span><b id="proto">—</b></div>
 <div class="row"><span>الجهاز</span><b id="dev">—</b></div>
+<div class="row"><span>التاريخ والوقت</span><b id="ts">—</b></div>
+<button id="copy" type="button" hidden>نسخ الرقم</button> 
 <details><summary class="hint">السجل التقني</summary><pre id="log"></pre></details>
 </div>
 <script>
@@ -89,11 +91,11 @@ async function go(){
     const p=(await send('ATDPN')).replace(/[^0-9A-F]/gi,'');
     $('proto').textContent=PROTO[p.slice(-1)]||p||'—';
     const vin=parseVin(r);
-    if(vin){$('vin').textContent=vin;st('تمت قراءة الرقم ✓');}
+    if(vin){$('vin').textContent=vin;$('ts').textContent=new Date().toLocaleString('en-GB');$('copy').hidden=false;st('تمت قراءة الرقم ✓');}
     else st('لم يُستخرج الرقم. أرسل السجل التقني.');
   }catch(e){log('ERROR: '+e);st('تعذّر الاتصال: '+e.message);}
   finally{try{if(device&&device.gatt.connected)device.gatt.disconnect();}catch(e){}wr=null;$('go').disabled=false;}
-}
+$('copy').addEventListener('click',()=>{navigator.clipboard.writeText($('vin').textContent).then(()=>st('نُسخ الرقم ✓'));});
 $('go').addEventListener('click',go);
 </script>
 </body>

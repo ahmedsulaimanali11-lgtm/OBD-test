@@ -40,7 +40,7 @@ let wr=null,buf='',waiter=null,device=null;
 function onData(e){
   buf+=new TextDecoder().decode(e.target.value);
   if(buf.indexOf('>')>=0&&waiter){const o=buf.replace('>','');buf='';const w=waiter;waiter=null;w(o);}
-<script>
+}
 function send(cmd,ms){
   return new Promise(async res=>{
     buf='';waiter=res;
